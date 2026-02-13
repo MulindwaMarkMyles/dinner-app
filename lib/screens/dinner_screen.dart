@@ -35,7 +35,7 @@ class _DinnerScreenState extends State<DinnerScreen> {
       final user = await _apiService.consumeDinner(
         firstName: widget.scannedUser.firstName,
         lastName: widget.scannedUser.lastName,
-        gender: widget.scannedUser.gender,
+        gender: widget.scannedUser.safeGender,
       );
       setState(() {
         _user = user;
@@ -57,22 +57,20 @@ class _DinnerScreenState extends State<DinnerScreen> {
         backgroundColor: Colors.white,
         elevation: 0,
         centerTitle: true,
-        iconTheme: const IconThemeData(color: Colors.black),
         title: Text(
-          'DINNER',
+          'DINNER SERVICE',
           style: GoogleFonts.poppins(
-            fontSize: 16,
-            fontWeight: FontWeight.w700,
+            fontSize: 14,
+            fontWeight: FontWeight.w800,
             letterSpacing: 2.0,
-            color: Colors.black,
           ),
         ),
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: Colors.black, strokeWidth: 2))
+          ? const Center(child: CircularProgressIndicator(strokeWidth: 3))
           : _error != null
-              ? _buildError()
-              : _buildSuccess(),
+          ? _buildError()
+          : _buildSuccess(),
     );
   }
 
@@ -83,20 +81,44 @@ class _DinnerScreenState extends State<DinnerScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.close, size: 48, color: Colors.black),
-            const SizedBox(height: 24),
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: Colors.red.shade50,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.error_outline_rounded,
+                size: 64,
+                color: Colors.red.shade400,
+              ),
+            ),
+            const SizedBox(height: 32),
             Text(
-              'ERROR',
-              style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w800, letterSpacing: 1.5),
+              'ACCESS DENIED',
+              style: GoogleFonts.poppins(
+                fontSize: 20,
+                fontWeight: FontWeight.w800,
+                color: Colors.red.shade700,
+                letterSpacing: 1.5,
+              ),
             ),
             const SizedBox(height: 12),
             Text(
               _error!.toUpperCase(),
               textAlign: TextAlign.center,
-              style: GoogleFonts.inter(fontSize: 14, color: Colors.black54, fontWeight: FontWeight.w400),
+              style: GoogleFonts.inter(
+                fontSize: 15,
+                color: Colors.grey.shade600,
+                fontWeight: FontWeight.w500,
+              ),
             ),
             const SizedBox(height: 48),
-            _buildActionButton('GO BACK', () => Navigator.pop(context)),
+            _buildActionButton(
+              'TRY AGAIN',
+              () => Navigator.pop(context),
+              isError: true,
+            ),
           ],
         ),
       ),
@@ -107,16 +129,32 @@ class _DinnerScreenState extends State<DinnerScreen> {
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 60),
+        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 40),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Icon(Icons.check, size: 64, color: Colors.black),
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: Colors.green.shade50,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.check_circle_rounded,
+                size: 80,
+                color: Colors.green.shade400,
+              ),
+            ),
             const SizedBox(height: 32),
             Center(
               child: Text(
                 'CONSUMPTION CONFIRMED',
-                style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 2.5),
+                style: GoogleFonts.poppins(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 3.0,
+                  color: Colors.green.shade700,
+                ),
               ),
             ),
             const SizedBox(height: 16),
@@ -124,10 +162,14 @@ class _DinnerScreenState extends State<DinnerScreen> {
               child: Text(
                 _user!.fullName.toUpperCase(),
                 textAlign: TextAlign.center,
-                style: GoogleFonts.poppins(fontSize: 28, fontWeight: FontWeight.w300),
+                style: GoogleFonts.poppins(
+                  fontSize: 32,
+                  fontWeight: FontWeight.w200,
+                  color: MyApp.primaryBlue,
+                ),
               ),
             ),
-            const SizedBox(height: 60),
+            const SizedBox(height: 48),
             _buildAllowanceSection(),
             const SizedBox(height: 60),
             _buildActionButton('DONE', () => Navigator.pop(context)),
@@ -138,53 +180,107 @@ class _DinnerScreenState extends State<DinnerScreen> {
   }
 
   Widget _buildAllowanceSection() {
-    return Column(
-      children: [
-        const Divider(color: Colors.black, thickness: 1),
-        const SizedBox(height: 24),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            _buildAllowanceItem('LUNCH', _user!.lunchesRemaining),
-            _buildAllowanceItem('DINNER', _user!.dinnersRemaining),
-            _buildAllowanceItem('DRINKS', _user!.drinksRemaining),
-          ],
-        ),
-        const SizedBox(height: 24),
-        const Divider(color: Colors.black, thickness: 1),
-      ],
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        children: [
+          Text(
+            'REMAINING ALLOWANCE',
+            style: GoogleFonts.poppins(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: Colors.grey.shade500,
+              letterSpacing: 1.5,
+            ),
+          ),
+          const SizedBox(height: 24),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              _buildAllowanceItem(
+                'LUNCH',
+                _user!.lunchesRemaining,
+                Colors.orange,
+              ),
+              _buildAllowanceItem(
+                'DINNER',
+                _user!.dinnersRemaining,
+                Colors.green,
+              ),
+              _buildAllowanceItem(
+                'DRINKS',
+                _user!.drinksRemaining,
+                Colors.blue,
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
-  Widget _buildAllowanceItem(String label, int count) {
+  Widget _buildAllowanceItem(String label, int count, MaterialColor color) {
     return Column(
       children: [
         Text(
           '$count',
-          style: GoogleFonts.poppins(fontSize: 32, fontWeight: FontWeight.w600),
+          style: GoogleFonts.poppins(
+            fontSize: 28,
+            fontWeight: FontWeight.bold,
+            color: color.shade700,
+          ),
         ),
         Text(
           label,
-          style: GoogleFonts.inter(fontSize: 9, fontWeight: FontWeight.w700, color: Colors.black54, letterSpacing: 1.2),
+          style: GoogleFonts.inter(
+            fontSize: 10,
+            fontWeight: FontWeight.w800,
+            color: Colors.grey.shade500,
+            letterSpacing: 1.0,
+          ),
         ),
       ],
     );
   }
 
-  Widget _buildActionButton(String label, VoidCallback onPressed) {
-    return SizedBox(
-      width: double.infinity,
-      child: TextButton(
+  Widget _buildActionButton(
+    String label,
+    VoidCallback onPressed, {
+    bool isError = false,
+  }) {
+    return Container(
+      height: 64,
+      decoration: BoxDecoration(
+        boxShadow: [
+          BoxShadow(
+            color: (isError ? Colors.red : MyApp.primaryBlue).withOpacity(0.3),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: ElevatedButton(
         onPressed: onPressed,
-        style: TextButton.styleFrom(
-          backgroundColor: Colors.black,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: isError ? Colors.red : MyApp.primaryBlue,
           foregroundColor: Colors.white,
-          padding: const EdgeInsets.symmetric(vertical: 20),
-          shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          elevation: 0,
         ),
         child: Text(
           label,
-          style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w800, letterSpacing: 2.0),
+          style: GoogleFonts.poppins(
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 2.0,
+          ),
         ),
       ),
     );

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import '../main.dart';
 
 class QrScannerScreen extends StatefulWidget {
   final String title;
@@ -24,12 +25,14 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
 
   void _onDetect(BarcodeCapture capture) {
     if (_isProcessing) return;
-    
+
     final List<Barcode> barcodes = capture.barcodes;
     if (barcodes.isEmpty) return;
 
-    final String? code = barcodes.first.rawValue;
-    if (code == null || code.isEmpty) return;
+    final String? rawCode = barcodes.first.rawValue;
+    if (rawCode == null) return;
+    final String code = rawCode.replaceAll('\r\n', '\n').trim();
+    if (code.isEmpty) return;
 
     // Debug print to see what was scanned
     print('==========================================');
@@ -58,36 +61,34 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
         backgroundColor: Colors.white,
         elevation: 0,
         centerTitle: true,
-        iconTheme: const IconThemeData(color: Colors.black),
         title: Text(
           widget.title.toUpperCase(),
           style: GoogleFonts.poppins(
-            fontSize: 16,
-            fontWeight: FontWeight.w700,
+            fontSize: 14,
+            fontWeight: FontWeight.w800,
             letterSpacing: 2.0,
-            color: Colors.black,
           ),
         ),
         actions: [
           IconButton(
             icon: Icon(
-              _torchOn ? Icons.flash_on : Icons.flash_off,
-              color: Colors.black,
+              _torchOn ? Icons.flash_on_rounded : Icons.flash_off_rounded,
+              color: MyApp.primaryBlue,
             ),
             onPressed: _toggleTorch,
           ),
           IconButton(
-            icon: const Icon(Icons.flip_camera_ios, color: Colors.black),
+            icon: const Icon(
+              Icons.flip_camera_ios_rounded,
+              color: MyApp.primaryBlue,
+            ),
             onPressed: _switchCamera,
           ),
         ],
       ),
       body: Stack(
         children: [
-          MobileScanner(
-            controller: _controller,
-            onDetect: _onDetect,
-          ),
+          MobileScanner(controller: _controller, onDetect: _onDetect),
           _buildOverlay(),
         ],
       ),
@@ -96,31 +97,53 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
 
   Widget _buildOverlay() {
     return Container(
-      decoration: const ShapeDecoration(
+      decoration: ShapeDecoration(
         shape: QrScannerOverlayShape(
-          borderColor: Colors.white,
-          borderRadius: 0,
+          borderColor: MyApp.primaryBlue,
+          borderRadius: 24,
           borderLength: 40,
-          borderWidth: 2,
-          cutOutSize: 250,
+          borderWidth: 8,
+          cutOutSize: 280,
         ),
       ),
       child: Align(
         alignment: Alignment.bottomCenter,
         child: Container(
           width: double.infinity,
-          margin: const EdgeInsets.all(40),
-          padding: const EdgeInsets.symmetric(vertical: 20),
-          color: Colors.white,
-          child: Text(
-            'ALIGN QR CODE WITHIN FRAME',
-            style: GoogleFonts.poppins(
-              color: Colors.black,
-              fontSize: 10,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 1.5,
-            ),
-            textAlign: TextAlign.center,
+          margin: const EdgeInsets.symmetric(horizontal: 32, vertical: 64),
+          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 32),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.9),
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.2),
+                blurRadius: 20,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(
+                Icons.qr_code_scanner_rounded,
+                color: MyApp.primaryBlue,
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Text(
+                  'ALIGN QR CODE WITHIN FRAME',
+                  style: GoogleFonts.poppins(
+                    color: MyApp.primaryBlue,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1.5,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -181,13 +204,15 @@ class QrScannerOverlayShape extends ShapeBorder {
 
     final backgroundPath = Path()
       ..addRect(rect)
-      ..addRRect(RRect.fromRectAndRadius(
-        cutOutRect,
-        Radius.circular(borderRadius),
-      ))
+      ..addRRect(
+        RRect.fromRectAndRadius(cutOutRect, Radius.circular(borderRadius)),
+      )
       ..fillType = PathFillType.evenOdd;
 
-    canvas.drawPath(backgroundPath, Paint()..color = Colors.black.withOpacity(0.7));
+    canvas.drawPath(
+      backgroundPath,
+      Paint()..color = Colors.black.withOpacity(0.7),
+    );
 
     final borderPaint = Paint()
       ..color = borderColor

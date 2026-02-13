@@ -3,7 +3,7 @@ import '../models/user_model.dart';
 import '../models/drink_model.dart';
 
 class ApiService {
-  static const String baseUrl = 'http://192.168.100.27:8000/main/api';
+  static const String baseUrl = 'http://104.248.187.7:8000/main/api';
   late final Dio _dio;
 
   ApiService() {
