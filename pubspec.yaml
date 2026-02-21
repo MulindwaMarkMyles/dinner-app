@@ -38,6 +38,9 @@ dependencies:
   dio: ^5.9.1
   flutter_native_splash: ^2.4.7
   google_fonts: ^8.0.0
+  shared_preferences: ^2.5.3
+  flutter_markdown: ^0.7.7+1
+  markdown: ^7.3.0
 
 dev_dependencies:
   flutter_test:

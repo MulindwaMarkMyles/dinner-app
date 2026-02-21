@@ -5,6 +5,7 @@ import 'screens/lunch_screen.dart';
 import 'screens/dinner_screen.dart';
 import 'screens/drinks_screen.dart';
 import 'screens/qr_scanner_screen.dart';
+import 'screens/chatbot_screen.dart';
 
 void main() {
   runApp(const MyApp());
@@ -494,7 +495,7 @@ class _MyHomePageState extends State<MyHomePage> {
                               ),
                             ),
                             Text(
-                              'Digital Coupon System',
+                              'AI Digital Coupon System',
                               style: GoogleFonts.inter(
                                 fontSize: 14,
                                 color: Colors.white.withOpacity(0.8),
@@ -537,6 +538,17 @@ class _MyHomePageState extends State<MyHomePage> {
                   icon: Icons.local_bar_rounded,
                   accentColor: const Color(0xFF64B5F6),
                   onTap: () => _scanAndRoute(ModuleType.drinks),
+                ),
+                _ModuleCard(
+                  title: 'AI Chatbot',
+                  subtitle: 'Ask the assistant',
+                  icon: Icons.support_agent_rounded,
+                  accentColor: const Color(0xFF9575CD),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const ChatbotScreen()),
+                    );
+                  },
                 ),
               ],
             ),
