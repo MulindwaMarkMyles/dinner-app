@@ -134,8 +134,8 @@ class ChatbotConversationSummary {
 }
 
 class ApiService {
-  // static const String baseUrl = 'https://strucure.cloud/main/api';
-  static const String baseUrl = 'http://192.168.1.64:8000/main/api';
+  static const String baseUrl = 'https://strucure.cloud/main/api';
+  // static const String baseUrl = 'http://192.168.1.64:8000/main/api';
   static const String _accessTokenKey = 'access_token';
   static const String _refreshTokenKey = 'refresh_token';
   static String? _accessToken;

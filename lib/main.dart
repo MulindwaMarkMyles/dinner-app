@@ -560,7 +560,16 @@ class _MyHomePageState extends State<MyHomePage> {
                   subtitle: 'Scan for Dinner',
                   icon: Icons.restaurant_rounded,
                   accentColor: const Color(0xFF81C784),
-                  onTap: () => _scanAndRoute(ModuleType.dinner),
+                  // onTap: () => _scanAndRoute(ModuleType.dinner),
+                  onTap: () => {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Coming Soon.'),
+                        backgroundColor: MyApp.primaryBlue,
+                        duration: Duration(seconds: 3),
+                      ),
+                    )
+                  },
                 ),
                 _ModuleCard(
                   title: 'Drinks',
@@ -574,7 +583,16 @@ class _MyHomePageState extends State<MyHomePage> {
                   subtitle: 'Scan for BBQ',
                   icon: Icons.outdoor_grill_rounded,
                   accentColor: const Color(0xFFE57373),
-                  onTap: () => _scanAndRoute(ModuleType.bbq),
+                  // onTap: () => _scanAndRoute(ModuleType.bbq),
+                  onTap: () => {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Coming Soon.'),
+                        backgroundColor: MyApp.primaryBlue,
+                        duration: Duration(seconds: 3),
+                      ),
+                    )
+                  },
                 ),
                 _ModuleCard(
                   title: 'AI Chatbot',
