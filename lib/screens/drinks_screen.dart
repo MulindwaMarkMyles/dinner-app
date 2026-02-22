@@ -22,6 +22,7 @@ class _DrinksScreenState extends State<DrinksScreen> {
   List<Drink> _drinks = [];
   Drink? _selectedDrink;
   int _quantity = 1;
+  final Map<Drink, int> _selectedItems = {};
   User? _user;
   String? _error;
   bool _isDrinkConsumed = false;
@@ -48,10 +49,10 @@ class _DrinksScreenState extends State<DrinksScreen> {
   }
 
   Future<void> _consumeDrink() async {
-    if (_selectedDrink == null || _servingPointController.text.trim().isEmpty) {
+    if (_selectedItems.isEmpty || _servingPointController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Please select a drink and enter serving point'),
+          content: Text('Please add at least one drink and enter serving point'),
         ),
       );
       return;
@@ -65,8 +66,14 @@ class _DrinksScreenState extends State<DrinksScreen> {
         lastName: widget.scannedUser.lastName,
         gender: widget.scannedUser.safeGender,
         servingPoint: _servingPointController.text.trim(),
-        drinkName: _selectedDrink!.name,
-        quantity: _quantity,
+        items: _selectedItems.entries
+            .map(
+              (entry) => {
+                'drink_name': entry.key.name,
+                'quantity': entry.value,
+              },
+            )
+            .toList(),
       );
 
       setState(() {
@@ -275,8 +282,79 @@ class _DrinksScreenState extends State<DrinksScreen> {
               ),
             ],
           ),
+          const SizedBox(height: 24),
+          _buildActionButton('ADD ITEM', _addSelectedItem),
+          const SizedBox(height: 20),
+          if (_selectedItems.isNotEmpty) _buildSelectedItemsSection(),
           const SizedBox(height: 64),
-          _buildActionButton('SERVE DRINK', _consumeDrink),
+          _buildActionButton('SUBMIT ORDER', _consumeDrink),
+        ],
+      ),
+    );
+  }
+
+  void _addSelectedItem() {
+    if (_selectedDrink == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select a drink first')),
+      );
+      return;
+    }
+
+    setState(() {
+      final existing = _selectedItems[_selectedDrink!] ?? 0;
+      _selectedItems[_selectedDrink!] = existing + _quantity;
+      _quantity = 1;
+    });
+  }
+
+  Widget _buildSelectedItemsSection() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'ORDER ITEMS',
+            style: GoogleFonts.poppins(
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+              color: Colors.grey.shade500,
+              letterSpacing: 1.5,
+            ),
+          ),
+          const SizedBox(height: 12),
+          ..._selectedItems.entries.map(
+            (entry) => Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      '${entry.value} × ${entry.key.name}',
+                      style: GoogleFonts.inter(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black87,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () {
+                      setState(() => _selectedItems.remove(entry.key));
+                    },
+                    icon: const Icon(Icons.close_rounded),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -395,7 +473,10 @@ class _DrinksScreenState extends State<DrinksScreen> {
             const SizedBox(height: 8),
             Center(
               child: Text(
-                '$_quantity × ${_selectedDrink!.name}'.toUpperCase(),
+                _selectedItems.entries
+                    .map((entry) => '${entry.value}×${entry.key.name}')
+                    .join(' • ')
+                    .toUpperCase(),
                 style: GoogleFonts.inter(
                   fontSize: 14,
                   color: Colors.grey.shade600,

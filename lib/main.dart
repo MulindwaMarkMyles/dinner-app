@@ -4,8 +4,11 @@ import 'package:google_fonts/google_fonts.dart';
 import 'screens/lunch_screen.dart';
 import 'screens/dinner_screen.dart';
 import 'screens/drinks_screen.dart';
+import 'screens/bbq_screen.dart';
 import 'screens/qr_scanner_screen.dart';
 import 'screens/chatbot_screen.dart';
+import 'screens/login_screen.dart';
+import 'services/api_service.dart';
 
 void main() {
   runApp(const MyApp());
@@ -101,20 +104,27 @@ class _SplashScreenState extends State<SplashScreen>
     _controller.forward();
 
     Future.delayed(const Duration(seconds: 3), () {
-      if (mounted) {
-        Navigator.of(context).pushReplacement(
-          PageRouteBuilder(
-            pageBuilder: (context, animation, secondaryAnimation) =>
-                const MyHomePage(title: 'DR'),
-            transitionsBuilder:
-                (context, animation, secondaryAnimation, child) {
-                  return FadeTransition(opacity: animation, child: child);
-                },
-            transitionDuration: const Duration(milliseconds: 800),
-          ),
-        );
-      }
+      _navigateFromSplash();
     });
+  }
+
+  Future<void> _navigateFromSplash() async {
+    await ApiService.initializeAuth();
+    if (!mounted) return;
+
+    final Widget destination = ApiService.isLoggedIn
+        ? const MyHomePage(title: 'DR')
+        : const LoginScreen();
+
+    Navigator.of(context).pushReplacement(
+      PageRouteBuilder(
+        pageBuilder: (context, animation, secondaryAnimation) => destination,
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          return FadeTransition(opacity: animation, child: child);
+        },
+        transitionDuration: const Duration(milliseconds: 800),
+      ),
+    );
   }
 
   @override
@@ -227,7 +237,7 @@ class MyHomePage extends StatefulWidget {
   State<MyHomePage> createState() => _MyHomePageState();
 }
 
-enum ModuleType { lunch, dinner, drinks }
+enum ModuleType { lunch, dinner, bbq, drinks }
 
 class ScannedUser {
   final String firstName;
@@ -352,10 +362,22 @@ class ScannedUser {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
+  final ApiService _apiService = ApiService();
+
+  Future<void> _logout() async {
+    await _apiService.logout();
+    if (!mounted) return;
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
+      (route) => false,
+    );
+  }
+
   Future<void> _scanAndRoute(ModuleType module) async {
     final moduleLabel = switch (module) {
       ModuleType.lunch => 'Scan for Lunch',
       ModuleType.dinner => 'Scan for Dinner',
+      ModuleType.bbq => 'Scan for BBQ',
       ModuleType.drinks => 'Scan for Drinks',
     };
 
@@ -384,6 +406,7 @@ class _MyHomePageState extends State<MyHomePage> {
       Widget screen = switch (module) {
         ModuleType.lunch => LunchScreen(scannedUser: user),
         ModuleType.dinner => DinnerScreen(scannedUser: user),
+        ModuleType.bbq => BbqScreen(scannedUser: user),
         ModuleType.drinks => DrinksScreen(scannedUser: user),
       };
 
@@ -416,6 +439,13 @@ class _MyHomePageState extends State<MyHomePage> {
             pinned: true,
             backgroundColor: MyApp.primaryBlue,
             elevation: 0,
+            actions: [
+              IconButton(
+                onPressed: _logout,
+                tooltip: 'Logout',
+                icon: const Icon(Icons.logout_rounded, color: Colors.white),
+              ),
+            ],
             flexibleSpace: FlexibleSpaceBar(
               background: Container(
                 decoration: const BoxDecoration(
@@ -538,6 +568,13 @@ class _MyHomePageState extends State<MyHomePage> {
                   icon: Icons.local_bar_rounded,
                   accentColor: const Color(0xFF64B5F6),
                   onTap: () => _scanAndRoute(ModuleType.drinks),
+                ),
+                _ModuleCard(
+                  title: 'BBQ',
+                  subtitle: 'Scan for BBQ',
+                  icon: Icons.outdoor_grill_rounded,
+                  accentColor: const Color(0xFFE57373),
+                  onTap: () => _scanAndRoute(ModuleType.bbq),
                 ),
                 _ModuleCard(
                   title: 'AI Chatbot',

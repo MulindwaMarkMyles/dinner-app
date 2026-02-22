@@ -1,6 +1,45 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user_model.dart';
 import '../models/drink_model.dart';
+
+class AuthUser {
+  final int id;
+  final String username;
+  final bool isStaff;
+
+  AuthUser({required this.id, required this.username, required this.isStaff});
+
+  factory AuthUser.fromJson(Map<String, dynamic> json) {
+    return AuthUser(
+      id: json['id'],
+      username: (json['username'] ?? '').toString(),
+      isStaff: json['is_staff'] == true,
+    );
+  }
+}
+
+class LoginResponse {
+  final String access;
+  final String refresh;
+  final AuthUser user;
+
+  LoginResponse({
+    required this.access,
+    required this.refresh,
+    required this.user,
+  });
+
+  factory LoginResponse.fromJson(Map<String, dynamic> json) {
+    return LoginResponse(
+      access: (json['access'] ?? '').toString(),
+      refresh: (json['refresh'] ?? '').toString(),
+      user: AuthUser.fromJson(json['user'] as Map<String, dynamic>),
+    );
+  }
+}
 
 class ChatbotSendResponse {
   final int conversationId;
@@ -95,7 +134,18 @@ class ChatbotConversationSummary {
 }
 
 class ApiService {
-  static const String baseUrl = 'https://strucure.cloud/main/api';
+  // static const String baseUrl = 'https://strucure.cloud/main/api';
+  static const String baseUrl = 'http://192.168.1.64:8000/main/api';
+  static const String _accessTokenKey = 'access_token';
+  static const String _refreshTokenKey = 'refresh_token';
+  static String? _accessToken;
+  static String? _refreshToken;
+  static bool _isRefreshing = false;
+  static Completer<void>? _refreshCompleter;
+
+  static bool get isLoggedIn =>
+      _accessToken != null && _accessToken!.trim().isNotEmpty;
+
   late final Dio _dio;
 
   ApiService() {
@@ -107,6 +157,67 @@ class ApiService {
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
+        },
+      ),
+    );
+
+    _dio.interceptors.add(
+      InterceptorsWrapper(
+        onRequest: (options, handler) async {
+          await initializeAuth();
+          final hasAuthHeader = options.headers.containsKey('Authorization');
+          if (_isConsumePath(options.path) && !hasAuthHeader && isLoggedIn) {
+            options.headers['Authorization'] = 'Bearer $_accessToken';
+          }
+          handler.next(options);
+        },
+        onError: (error, handler) async {
+          final statusCode = error.response?.statusCode;
+          final requestOptions = error.requestOptions;
+          final alreadyRetried = requestOptions.extra['retried'] == true;
+          final isAuthRoute = requestOptions.path.contains('/auth/login/') ||
+              requestOptions.path.contains('/auth/refresh/');
+
+          if (statusCode == 401 && !alreadyRetried && !isAuthRoute) {
+            final refreshed = await _refreshAccessToken();
+            if (refreshed) {
+              try {
+                final retryOptions = Options(
+                  method: requestOptions.method,
+                  headers: Map<String, dynamic>.from(requestOptions.headers)
+                    ..['Authorization'] = 'Bearer $_accessToken',
+                  responseType: requestOptions.responseType,
+                  contentType: requestOptions.contentType,
+                  receiveDataWhenStatusError:
+                      requestOptions.receiveDataWhenStatusError,
+                  followRedirects: requestOptions.followRedirects,
+                  validateStatus: requestOptions.validateStatus,
+                  sendTimeout: requestOptions.sendTimeout,
+                  receiveTimeout: requestOptions.receiveTimeout,
+                  extra: Map<String, dynamic>.from(requestOptions.extra)
+                    ..['retried'] = true,
+                );
+
+                final retryResponse = await _dio.request<dynamic>(
+                  requestOptions.path,
+                  data: requestOptions.data,
+                  queryParameters: requestOptions.queryParameters,
+                  options: retryOptions,
+                  cancelToken: requestOptions.cancelToken,
+                  onReceiveProgress: requestOptions.onReceiveProgress,
+                  onSendProgress: requestOptions.onSendProgress,
+                );
+
+                return handler.resolve(retryResponse);
+              } on DioException catch (retryError) {
+                return handler.next(retryError);
+              }
+            }
+
+            await logoutStatic();
+          }
+
+          handler.next(error);
         },
       ),
     );
@@ -125,12 +236,132 @@ class ApiService {
     );
   }
 
+  static Future<void> initializeAuth() async {
+    if (_accessToken != null) return;
+    final prefs = await SharedPreferences.getInstance();
+    _accessToken = prefs.getString(_accessTokenKey);
+    _refreshToken = prefs.getString(_refreshTokenKey);
+  }
+
+  Future<LoginResponse> login({
+    required String username,
+    required String password,
+  }) async {
+    try {
+      final response = await _dio.post(
+        '/auth/login/',
+        data: {'username': username, 'password': password},
+      );
+
+      final data = response.data as Map<String, dynamic>;
+      final loginResponse = LoginResponse.fromJson(data);
+      await _saveTokens(
+        access: loginResponse.access,
+        refresh: loginResponse.refresh,
+      );
+
+      return loginResponse;
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  Future<void> logout() async {
+    await logoutStatic();
+  }
+
+  static Future<void> logoutStatic() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_accessTokenKey);
+    await prefs.remove(_refreshTokenKey);
+    _accessToken = null;
+    _refreshToken = null;
+  }
+
+  static Future<void> _saveTokens({
+    required String access,
+    required String refresh,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_accessTokenKey, access);
+    await prefs.setString(_refreshTokenKey, refresh);
+    _accessToken = access;
+    _refreshToken = refresh;
+  }
+
+  static bool _isConsumePath(String path) {
+    final normalized = path.startsWith('/') ? path : '/$path';
+    return normalized == '/lunch/' ||
+        normalized == '/dinner/' ||
+        normalized == '/bbq/' ||
+        normalized == '/drink/';
+  }
+
+  static Future<bool> _refreshAccessToken() async {
+    await initializeAuth();
+    final refreshToken = _refreshToken;
+    if (refreshToken == null || refreshToken.isEmpty) return false;
+
+    if (_isRefreshing) {
+      await _refreshCompleter?.future;
+      return isLoggedIn;
+    }
+
+    _isRefreshing = true;
+    _refreshCompleter = Completer<void>();
+
+    try {
+      final dio = Dio(
+        BaseOptions(
+          baseUrl: baseUrl,
+          connectTimeout: const Duration(seconds: 10),
+          receiveTimeout: const Duration(seconds: 10),
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+        ),
+      );
+
+      final response = await dio.post(
+        '/auth/refresh/',
+        data: {'refresh': refreshToken},
+      );
+
+      final data = response.data as Map<String, dynamic>;
+      final newAccess = (data['access'] ?? '').toString();
+      if (newAccess.isEmpty) return false;
+
+      final newRefresh = (data['refresh'] ?? refreshToken).toString();
+      await _saveTokens(access: newAccess, refresh: newRefresh);
+      return true;
+    } catch (_) {
+      return false;
+    } finally {
+      _isRefreshing = false;
+      _refreshCompleter?.complete();
+      _refreshCompleter = null;
+    }
+  }
+
+  Future<Options> _authorizedOptions() async {
+    await initializeAuth();
+    if (!isLoggedIn) {
+      throw 'Authentication required. Please login again.';
+    }
+
+    return Options(
+      headers: {'Authorization': 'Bearer $_accessToken'},
+    );
+  }
+
   Future<User> consumeLunch({
     required String firstName,
     required String lastName,
     required String gender,
   }) async {
     try {
+      final options = await _authorizedOptions();
       final response = await _dio.post(
         '/lunch/',
         data: {
@@ -138,6 +369,7 @@ class ApiService {
           'last_name': lastName,
           'gender': gender,
         },
+        options: options,
       );
 
       return User.fromJson(response.data);
@@ -152,6 +384,7 @@ class ApiService {
     required String gender,
   }) async {
     try {
+      final options = await _authorizedOptions();
       final response = await _dio.post(
         '/dinner/',
         data: {
@@ -159,6 +392,30 @@ class ApiService {
           'last_name': lastName,
           'gender': gender,
         },
+        options: options,
+      );
+
+      return User.fromJson(response.data);
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  Future<User> consumeBbq({
+    required String firstName,
+    required String lastName,
+    required String gender,
+  }) async {
+    try {
+      final options = await _authorizedOptions();
+      final response = await _dio.post(
+        '/bbq/',
+        data: {
+          'first_name': firstName,
+          'last_name': lastName,
+          'gender': gender,
+        },
+        options: options,
       );
 
       return User.fromJson(response.data);
@@ -172,10 +429,10 @@ class ApiService {
     required String lastName,
     required String gender,
     required String servingPoint,
-    required String drinkName,
-    int quantity = 1,
+    required List<Map<String, dynamic>> items,
   }) async {
     try {
+      final options = await _authorizedOptions();
       final response = await _dio.post(
         '/drink/',
         data: {
@@ -183,16 +440,20 @@ class ApiService {
           'last_name': lastName,
           'gender': gender,
           'serving_point': servingPoint,
-          'drink_name': drinkName,
-          'quantity': quantity,
+          'items': items,
         },
+        options: options,
       );
 
-      final data = response.data;
+      final data = response.data as Map<String, dynamic>;
+      final List<dynamic> rawTransactions = data['transactions'] ?? [];
       return {
         'user': User.fromJson(data['user']),
-        'transaction': DrinkTransaction.fromJson(data['transaction']),
-        'drink_stock_remaining': data['drink_stock_remaining'],
+        'transactions': rawTransactions
+            .whereType<Map<String, dynamic>>()
+            .map(DrinkTransaction.fromJson)
+            .toList(),
+        'total_requested': data['total_requested'],
       };
     } on DioException catch (e) {
       throw _handleError(e);
@@ -302,7 +563,16 @@ class ApiService {
     if (e.response != null) {
       final data = e.response!.data;
       if (data is Map && data.containsKey('error')) {
-        return data['error'];
+        return data['error'].toString();
+      }
+      if (data is Map && data.containsKey('detail')) {
+        return data['detail'].toString();
+      }
+      if (data is Map && data.containsKey('non_field_errors')) {
+        final errors = data['non_field_errors'];
+        if (errors is List && errors.isNotEmpty) {
+          return errors.join(', ');
+        }
       }
       return 'Server error: ${e.response!.statusCode}';
     }

@@ -24,7 +24,10 @@ class DrinkTransaction {
   final String drinkName;
   final int quantity;
   final String servingPoint;
+  final String status;
   final String servedAt;
+  final String? approvedAt;
+  final String? scannedByUsername;
 
   DrinkTransaction({
     required this.id,
@@ -32,7 +35,10 @@ class DrinkTransaction {
     required this.drinkName,
     required this.quantity,
     required this.servingPoint,
+    required this.status,
     required this.servedAt,
+    this.approvedAt,
+    this.scannedByUsername,
   });
 
   factory DrinkTransaction.fromJson(Map<String, dynamic> json) {
@@ -42,7 +48,10 @@ class DrinkTransaction {
       drinkName: json['drink_name'],
       quantity: json['quantity'],
       servingPoint: json['serving_point'],
+      status: (json['status'] ?? '').toString(),
       servedAt: json['served_at'],
+      approvedAt: json['approved_at']?.toString(),
+      scannedByUsername: json['scanned_by_username']?.toString(),
     );
   }
 }
